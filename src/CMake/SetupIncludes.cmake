@@ -60,6 +60,9 @@ include_directories(${PROJECT_SOURCE_DIR}/alpine/pipelines)
 
 include_directories(${CONDUIT_INCLUDE_DIRS})
 
+include_directories(/usr/workspace/wsa/labasan1/alpine-paviz/libpowerawarevis-alpine/src)
+include_directories(/usr/workspace/wsa/labasan1/alpine-paviz/libmsr/include)
+
 if(VTKM_FOUND)
     # tbb
     if(TBB_FOUND)

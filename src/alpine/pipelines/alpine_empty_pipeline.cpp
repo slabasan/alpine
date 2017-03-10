@@ -181,7 +181,7 @@ EmptyPipeline::Publish(const conduit::Node &data)
 #endif
 
     // create our own tree, with all data zero copied.
-    m_data.set_external(data);
+    m_data.set(data);
 }
 
 //-----------------------------------------------------------------------------

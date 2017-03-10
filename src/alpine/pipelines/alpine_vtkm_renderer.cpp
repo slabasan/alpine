@@ -68,6 +68,11 @@ using namespace std;
 using namespace conduit;
 namespace alpine {
 
+#ifdef PARALLEL
+Controller *g_paviz;
+double g_running_render_time = 0.0;
+#endif
+
 //-----------------------------------------------------------------------------
 // VTKm utility  methods
 //-----------------------------------------------------------------------------
@@ -971,6 +976,7 @@ Renderer::Render(vtkmActor *&plot,
               totalExtent[1] = vtkm::Float32(m_spatial_bounds.Y.Max - m_spatial_bounds.Y.Min);
               totalExtent[2] = vtkm::Float32(m_spatial_bounds.Z.Max - m_spatial_bounds.Z.Min);
               vtkm::Float32 sample_distance = vtkm::Magnitude(totalExtent) / num_samples;
+            //Get estimate
               vtkmVolumeRenderer *volume_renderer = static_cast<vtkmVolumeRenderer*>(m_renderer);
               
               volume_renderer->SetSampleDistance(sample_distance);

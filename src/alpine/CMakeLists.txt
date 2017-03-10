@@ -91,7 +91,8 @@ set(alpine_headers
     utils/alpine_file_system.hpp
     utils/alpine_block_timer.hpp
     utils/alpine_png_encoder.hpp
-    utils/alpine_web_interface.hpp)
+    utils/alpine_web_interface.hpp
+    /usr/workspace/wsa/labasan1/alpine-paviz/libpowerawarevis-alpine/src/Controller.hpp)
 
 if(VTKM_FOUND)
     # VTKm Pipeline Headers
@@ -253,11 +254,20 @@ if(MPI_FOUND)
     add_target_link_flags(TARGET alpine_par  
                           FLAGS "${MPI_CXX_LINK_FLAGS}")
     
+    set(PAVIZ_LIBRARY
+        "/usr/workspace/wsa/labasan1/alpine-paviz/libpowerawarevis-alpine/lib/libpowerawarevis_par.so"
+        CACHE PATH "" FORCE)
+    set(LIBMSR_LIBRARY
+        "/usr/workspace/wsa/labasan1/alpine-paviz/libmsr/lib/libmsr.so"
+        CACHE PATH "" FORCE)
+
     target_link_libraries(alpine_par
                           conduit_relay_mpi
                           ${alpine_thirdparty_libs}
                           ${ICET_LIBRARIES}
-                          ${MPI_CXX_LIBRARIES})
+                          ${MPI_CXX_LIBRARIES}
+                          ${PAVIZ_LIBRARY}
+                          ${LIBMSR_LIBRARY})
 
 
    

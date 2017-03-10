@@ -57,6 +57,7 @@
 #include <vtkm/rendering/MapperVolume.h>
 #include <vtkm/cont/DeviceAdapter.h>
 #include <conduit.hpp>
+#include <Controller.hpp>
 
 #include <alpine_png_encoder.hpp>
 #include <alpine_web_interface.hpp>
@@ -83,8 +84,7 @@ namespace alpine
 // -- VTKm typedefs for convienince and sanity
 //-----------------------------------------------------------------------------
 
-
-
+ 
 
 //-----------------------------------------------------------------------------
 //

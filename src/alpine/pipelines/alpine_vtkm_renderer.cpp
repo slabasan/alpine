@@ -58,6 +58,10 @@
 #include <limits.h>
 #include <cstdlib>
 #include <sstream>
+#ifdef PARALLEL
+#include <sys/select.h> /* now_ms() */
+#include <time.h>       /* now_ms() */
+#endif
 
 // other alpine includes
 #include <alpine_block_timer.hpp>
@@ -71,6 +75,15 @@ namespace alpine {
 #ifdef PARALLEL
 Controller *g_paviz;
 double g_running_render_time = 0.0;
+
+static unsigned long now_ms(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    unsigned long sec = t.tv_sec * 1000;
+    unsigned long msec = (t.tv_nsec + 500000) / 1000000;
+    return sec + msec;
+}
 #endif
 
 //-----------------------------------------------------------------------------
@@ -98,6 +111,12 @@ Renderer::Renderer()
     m_rank  = 0; 
 }
 
+double
+Renderer::GetRenderEstimate(float *samples_per_pixel, float &active_pixels, ...)
+{
+  double estimate = 0.0;
+  return estimate;
+}
 
 //-----------------------------------------------------------------------------
 #ifdef PARALLEL
@@ -110,8 +129,13 @@ Renderer::Renderer(MPI_Comm mpi_comm)
     NullRendering();
     m_icet.Init(m_mpi_comm);
 
+    std::cerr << "<PAVIZ> Creating g_paviz" << std::endl;
+    g_paviz = new Controller(m_mpi_comm);
+
     MPI_Comm_rank(m_mpi_comm, &m_rank);
     MPI_Comm_size(m_mpi_comm, &m_mpi_size);
+    
+    std::cerr << "<PAVIZ> g_paviz on rank " << m_rank << " created at time " << now_ms() << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -561,6 +585,8 @@ Renderer::~Renderer()
 
 #ifdef PARALLEL
     m_icet.Cleanup();
+    std::cerr << "<PAVIZ> Deleting g_paviz" << std::endl;
+    delete g_paviz;
 #endif
 }
 
@@ -976,8 +1002,11 @@ Renderer::Render(vtkmActor *&plot,
               totalExtent[1] = vtkm::Float32(m_spatial_bounds.Y.Max - m_spatial_bounds.Y.Min);
               totalExtent[2] = vtkm::Float32(m_spatial_bounds.Z.Max - m_spatial_bounds.Z.Min);
               vtkm::Float32 sample_distance = vtkm::Magnitude(totalExtent) / num_samples;
-            //Get estimate
               vtkmVolumeRenderer *volume_renderer = static_cast<vtkmVolumeRenderer*>(m_renderer);
+              double est = GetRenderEstimate();
+#ifdef PARALLEL
+              g_paviz->estimate_render(est);
+#endif
               
               volume_renderer->SetSampleDistance(sample_distance);
 #ifdef PARALLEL
@@ -1022,7 +1051,22 @@ Renderer::Render(vtkmActor *&plot,
             ALPINE_BLOCK_TIMER(RENDER_PAINT);
 
             m_canvas->Clear();
-            plot->Render(*m_renderer, *m_canvas, *m_vtkm_camera);
+#ifdef PARALLEL
+            g_paviz->start_profiling();
+#endif
+            for (int i = 0; i < 100; i++) {
+              plot->Render(*m_renderer, *m_canvas, *m_vtkm_camera);
+            }
+
+#ifdef PARALLEL
+            //End paviz timer
+            const char *nodeid;
+            double runtime = g_paviz->end_profiling(&nodeid);
+            g_running_render_time += runtime;
+            std::cerr << "<PAVIZ> Rank " << nodeid << " done with render at time " << now_ms() << std::endl;
+            std::cout << "RRR <alpine> " << nodeid << " render time took " << runtime << " sec" << std::endl;
+            std::cout << "RRR <alpine> " << nodeid << " total render time now at " << g_running_render_time << " sec" << std::endl;
+#endif
 
         //---------------------------------------------------------------------
         } // close block for RENDER_PAINT Timer

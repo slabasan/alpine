@@ -134,6 +134,7 @@ public:
       void CreateDefaultTransferFunction(vtkmColorTable &color_table);
       void SetCamera(const conduit::Node &_camera);
       void SetData(conduit::Node *data_ptr);
+      double GetRenderEstimate(void);
   
       void ClearScene();
 

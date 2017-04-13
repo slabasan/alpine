@@ -68,6 +68,7 @@
 
 #include <vtkm/rendering/raytracing/Camera.h>
 #include <vtkm/Transform3D.h>
+
 #define DEFAULT_VR_SAMPLES 1000
 
 using namespace std;
@@ -1206,6 +1207,8 @@ Renderer::Render(vtkmActor *&plot,
 #else
             WebSocketPush(m_png_data);
 #endif
+            m_images[i].m_data_string += render_type + " >\n";
+            m_log_stream<<m_images[i].m_data_string;
 
             if(image_file_name != NULL) SaveImage(m_images[i].m_image_name.c_str());
         }// for each image

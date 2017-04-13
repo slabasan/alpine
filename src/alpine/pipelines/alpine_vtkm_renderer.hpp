@@ -180,6 +180,8 @@ private:
         vtkmCamera  m_camera;
         vtkmCanvas *m_canvas;
         std::string m_image_name;
+        std::map<std::string,float>  m_model_data;
+        std::string m_data_string;
 
         ImageData()
           : m_canvas(NULL),
@@ -238,7 +240,7 @@ private:
     void SetDefaultClippingPlane(vtkmCamera &camera);
     int  CountImages();
     vtkmColorTable  SetColorMapFromNode();
-    std::string GetModelInfo(const vtkmActor &actor, const int &image_num);
+    void GetModelInfo(const vtkmActor &actor, const int &image_num);
 //-----------------------------------------------------------------------------
 // private methods for MPI case
 //-----------------------------------------------------------------------------

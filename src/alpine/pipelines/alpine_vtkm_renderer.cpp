@@ -58,12 +58,17 @@
 #include <limits.h>
 #include <cstdlib>
 #include <sstream>
-
+#include <unistd.h>
+#include <sys/time.h>
 // other alpine includes
 #include <alpine_block_timer.hpp>
 #include <alpine_png_encoder.hpp>
 #include <alpine_web_interface.hpp>
 #include <alpine_vtkm_dataset_info.hpp>
+
+#include <vtkm/rendering/raytracing/Camera.h>
+
+#define DEFAULT_VR_SAMPLES 200
 
 using namespace std;
 using namespace conduit;
@@ -102,6 +107,7 @@ Renderer::Renderer()
 Renderer::Renderer(MPI_Comm mpi_comm)
 : m_mpi_comm(mpi_comm)
 {
+
     Init();
     NullRendering();
     m_icet.Init(m_mpi_comm);
@@ -504,7 +510,6 @@ Renderer::FindVisibilityOrdering(vtkmActor *plot, const vtkmCamera &camera)
         for(int i = 0; i < m_mpi_size; i++)
         {
             ((int*) vis_rank_order)[i] = vis_order[i].m_rank;
-            std::cout<<"Vis order "<<i<<" "<<((int*) vis_rank_order)[i] <<"\n";
         }
         
         free(z_array);
@@ -559,6 +564,18 @@ Renderer::SetParallelPlotExtents(vtkmActor * plot)
 
 Renderer::~Renderer()
 {
+    size_t host_leng = 64;
+    char host_name[host_leng];
+    gethostname(host_name, host_leng);
+
+    std::string hostname(host_name);
+    std::string file_name = hostname + ".log";
+
+    std::ofstream log_file;
+    log_file.open(file_name, std::fstream::app);
+    log_file<<m_log_stream.str();
+    log_file.close(); 
+
     ALPINE_BLOCK_TIMER(RENDERER_ON_DESTROY);
     
     Cleanup();
@@ -975,7 +992,7 @@ Renderer::Render(vtkmActor *&plot,
         {
 
               //set sample distance
-              const vtkm::Float32 num_samples = 200.f;
+              const vtkm::Float32 num_samples = DEFAULT_VR_SAMPLES;
               vtkm::Vec<vtkm::Float32,3> totalExtent;
               totalExtent[0] = vtkm::Float32(m_spatial_bounds.X.Max - m_spatial_bounds.X.Min);
               totalExtent[1] = vtkm::Float32(m_spatial_bounds.Y.Max - m_spatial_bounds.Y.Min);
@@ -989,7 +1006,10 @@ Renderer::Render(vtkmActor *&plot,
               volume_renderer->SetCompositeBackground(false);
 #endif
           }
-         
+
+        std::string render_type = "ray_tracer"; 
+        if(m_render_type == VOLUME) render_type = "volume";
+
 #ifdef PARALLEL
         SetParallelPlotExtents(plot);
         
@@ -1021,21 +1041,25 @@ Renderer::Render(vtkmActor *&plot,
             } 
         }
 #endif
-        if(VTKMDataSetInfo::IsRectilinear(*plot))
+    
+        for(int i = 0; i < image_count; ++i)
         {
-          std::cout<<"************we have a rectilinear dataset\n";
+            m_images[i].m_data_string = render_type + " <\n";
+            GetModelInfo(*plot,i);
         }
+
         //---------------------------------------------------------------------
         {// open block for RENDER_PAINT Timer
         //---------------------------------------------------------------------
             ALPINE_BLOCK_TIMER(RENDER_PAINT);
             for(int i = 0; i < image_count; ++i)
             {
-                std::cout<<"Rendering image "<<i<<"\n";
                 m_images[i].m_canvas->Clear();
                 plot->Render(*m_renderer, 
                              *m_images[i].m_canvas, 
                               m_images[i].m_camera);
+                m_images[i].m_data_string += m_renderer->LogString;
+                m_images[i].m_data_string += render_type + " >\n";
             }
         //---------------------------------------------------------------------
         } // close block for RENDER_PAINT Timer
@@ -1044,7 +1068,6 @@ Renderer::Render(vtkmActor *&plot,
         //Save the image.
         for(int i = 0; i < image_count; ++i)
         {
-            std::cout<<"compositing "<<i<<"\n";
 #ifdef PARALLEL
 
             const float *result_color_buffer = NULL;
@@ -1052,8 +1075,8 @@ Renderer::Render(vtkmActor *&plot,
             {// open block for RENDER_COMPOSITE Timer
             //---------------------------------------------------------------------
                 ALPINE_BLOCK_TIMER(RENDER_COMPOSITE);
-
-                  
+                timeval comp_start, comp_end;         
+                gettimeofday(&comp_start, NULL);
                 //
                 // init IceT parallel image compositing
                 //
@@ -1096,6 +1119,15 @@ Renderer::Render(vtkmActor *&plot,
                                                            bg_color);
                 }
             
+                gettimeofday(&comp_end, NULL);
+
+                double elapsed_time = (double)(comp_end.tv_sec - comp_start.tv_sec) + 
+                                      ((double)(comp_end.tv_usec - comp_start.tv_usec))/1000000.;
+              
+                std::stringstream cmp;
+                cmp<<"composite_time"<<" "<<elapsed_time<<"\n";
+                m_images[i].m_data_string += cmp.str();
+                
             //---------------------------------------------------------------------
             }// close block for RENDER_COMPOSITE Timer
             //---------------------------------------------------------------------
@@ -1135,6 +1167,12 @@ Renderer::Render(vtkmActor *&plot,
 #else
             WebSocketPush(m_png_data);
 #endif
+            for(int i = 0; i < image_count; ++i)
+            {
+                m_images[i].m_data_string += render_type + " >\n";
+                m_log_stream<<m_images[i].m_data_string;
+            }
+
             if(image_file_name != NULL) SaveImage(m_images[i].m_image_name.c_str());
         }// for each image
     }// end try
@@ -1157,7 +1195,6 @@ Renderer::CountImages()
     {
         if(m_camera["type"].as_string() == "cinema")
         {
-            std::cout<<"******CINEMA\n";
              
             if(!m_camera.has_path("phi") ||
                !m_camera.has_path("theta"))
@@ -1169,7 +1206,6 @@ Renderer::CountImages()
             images = phi * theta;
         }
     }
-    std::cout<<"Number of images "<<images<<"\n";
     return images;
 }
 
@@ -1294,7 +1330,6 @@ Renderer::SetupCameras(const std::string image_name)
         //std::cout<<m_images[i].m_image_name<<"\n";
     }
     
-    std::cout<<"Number of images "<<images<<"\n";
 }
 
 //-----------------------------------------------------------------------------
@@ -1369,9 +1404,92 @@ Renderer::ParseCameraNode(const conduit::Node &camera, vtkmCamera &res)
 }
 
 //-----------------------------------------------------------------------------
-std::string
+void
 Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
 {
+    
+    std::map<std::string,float> &model_data = m_images.at(image_num).m_model_data;
+    model_data.clear();
+    std::stringstream ss;
+    int topo_dims;
+    const std::string sep(" "); 
+    vtkmCanvas *canvas = m_images.at(image_num).m_canvas;
+
+    int image_height = canvas->GetHeight();
+    int image_width = canvas->GetWidth();
+
+    ss<<"image_height"<<sep<<image_height<<"\n";
+    ss<<"image_width"<<sep<<image_width<<"\n";
+    model_data["image_height"] = image_height;
+    model_data["image_width"] = image_width;
+
+
+    bool is_structured = VTKMDataSetInfo::IsStructured(actor, topo_dims);
+    if(is_structured)
+    {
+        ss<<"data_set_type"<<sep<<"structured"<<"\n";
+        ss<<"data_set_topo_dims"<<sep<<topo_dims<<"\n";
+        model_data["topo_dims"] = topo_dims; 
+        int point_dims[3];
+        int cell_dims[3];
+
+        for(int i = 0; i < 3; ++i)
+        {
+            cell_dims[i] = 0;    
+            point_dims[i] = 0;    
+        }
+
+        VTKMDataSetInfo::GetCellDims(actor, cell_dims);
+        VTKMDataSetInfo::GetPointDims(actor, point_dims);
+        
+        ss<<"cell_dim_x"<<sep<<cell_dims[0]<<"\n";
+        ss<<"cell_dim_y"<<sep<<cell_dims[1]<<"\n";
+        ss<<"cell_dim_z"<<sep<<cell_dims[2]<<"\n";
+
+        ss<<"point_dim_x"<<sep<<point_dims[0]<<"\n";
+        ss<<"point_dim_y"<<sep<<point_dims[1]<<"\n";
+        ss<<"point_dim_z"<<sep<<point_dims[2]<<"\n";
+
+        model_data["cell_dim_x"] = cell_dims[0];
+        model_data["cell_dim_y"] = cell_dims[1];
+        model_data["cell_dim_z"] = cell_dims[2];
+
+        model_data["point_dim_x"] = point_dims[0];
+        model_data["point_dim_y"] = point_dims[1];
+        model_data["point_dim_z"] = point_dims[2];
+
+    }
+
+    vtkm::rendering::raytracing::Camera r_cam;
+    vtkmCanvasRayTracer *rtc = static_cast<vtkmCanvasRayTracer*>(canvas);
+    if(rtc == NULL) ALPINE_ERROR("Failed to cast rt canvas");
+    r_cam.SetParameters(m_images[image_num].m_camera, *rtc);
+    r_cam.SetParameters(m_vtkm_camera, *rtc);
+    int active_pixels;
+    float ave_ray_dist;
+
+    r_cam.GetPixelData(actor.GetCoordinates(), active_pixels, ave_ray_dist);
+
+    ss<<"active_pixels"<<sep<<active_pixels<<"\n";
+    ss<<"ave_ray_dist"<<sep<<ave_ray_dist<<"\n";
+    model_data["active_pixels"] = active_pixels;
+    model_data["ave_ray_dist"] = ave_ray_dist;
+  
+    ss<<"rank"<<sep<<m_rank<<"\n";
+#ifdef PARALLEL
+    ss<<"num_ranks"<<sep<<m_mpi_size<<"\n";
+#endif
+
+    const vtkm::Float32 num_samples = DEFAULT_VR_SAMPLES;
+    vtkm::Vec<vtkm::Float32,3> totalExtent;
+    totalExtent[0] = vtkm::Float32(m_spatial_bounds.X.Max - m_spatial_bounds.X.Min);
+    totalExtent[1] = vtkm::Float32(m_spatial_bounds.Y.Max - m_spatial_bounds.Y.Min);
+    totalExtent[2] = vtkm::Float32(m_spatial_bounds.Z.Max - m_spatial_bounds.Z.Min);
+    vtkm::Float32 sample_distance = vtkm::Magnitude(totalExtent) / num_samples;
+    const float samples_per_ray = ave_ray_dist / sample_distance;
+    ss<<"samples_per_ray"<<sep<<samples_per_ray<<"\n";
+    model_data["samples_per_ray"] = samples_per_ray;
+    m_images.at(image_num).m_data_string += ss.str();
 
 }
 

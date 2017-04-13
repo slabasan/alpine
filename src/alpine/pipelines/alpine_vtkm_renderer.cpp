@@ -1059,7 +1059,6 @@ Renderer::Render(vtkmActor *&plot,
                              *m_images[i].m_canvas, 
                               m_images[i].m_camera);
                 m_images[i].m_data_string += m_renderer->LogString;
-                m_images[i].m_data_string += render_type + " >\n";
             }
         //---------------------------------------------------------------------
         } // close block for RENDER_PAINT Timer
@@ -1167,14 +1166,16 @@ Renderer::Render(vtkmActor *&plot,
 #else
             WebSocketPush(m_png_data);
 #endif
-            for(int i = 0; i < image_count; ++i)
-            {
-                m_images[i].m_data_string += render_type + " >\n";
-                m_log_stream<<m_images[i].m_data_string;
-            }
 
             if(image_file_name != NULL) SaveImage(m_images[i].m_image_name.c_str());
         }// for each image
+
+        for(int i = 0; i < image_count; ++i)
+        {
+            m_images[i].m_data_string += render_type + " >\n";
+            m_log_stream<<m_images[i].m_data_string;
+        }
+
     }// end try
     catch (vtkm::cont::Error error) 
     {

@@ -60,11 +60,14 @@
 #include <sstream>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/select.h> /* paviz */
+#include <time.h>       /* paviz */
 // other alpine includes
 #include <alpine_block_timer.hpp>
 #include <alpine_png_encoder.hpp>
 #include <alpine_web_interface.hpp>
 #include <alpine_vtkm_dataset_info.hpp>
+#include <Controller.hpp> /* paviz */
 
 #include <vtkm/rendering/raytracing/Camera.h>
 #include <vtkm/Transform3D.h>
@@ -106,6 +109,15 @@ Renderer::Renderer()
 #ifdef PARALLEL
 //-----------------------------------------------------------------------------
 
+static unsigned long now_ms(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t); 
+    unsigned long sec = t.tv_sec * 1000;
+    unsigned long msec = (t.tv_nsec + 500000) / 1000000;
+    return sec + msec;
+}
+
 Renderer::Renderer(MPI_Comm mpi_comm)
 : m_mpi_comm(mpi_comm)
 {
@@ -115,8 +127,17 @@ Renderer::Renderer(MPI_Comm mpi_comm)
     m_compositor = new IceTCompositor();
     m_compositor->Init(m_mpi_comm);
 
+    std::cerr << "Creating g_paviz" << std::endl;
+    g_paviz = new Controller(m_mpi_comm);
+
     MPI_Comm_rank(m_mpi_comm, &m_rank);
     MPI_Comm_size(m_mpi_comm, &m_mpi_size);
+    if (((m_mpi_size != 0) && !(m_mpi_size & (m_mpi_size - 1))) == false)
+    {
+        ALPINE_ERROR("Number of ranks specified is not a power of two");
+    }
+
+    std::cerr << "TIME " << m_rank << " g_paviz created " << now_ms() << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -595,6 +616,10 @@ Renderer::~Renderer()
 
 #ifdef PARALLEL
     m_compositor->Cleanup();
+    m_icet.Cleanup();
+
+    std::cerr << "DELETE g_paviz" << std::endl;
+    delete g_paviz;
 #endif
 }
 
@@ -1087,12 +1112,18 @@ Renderer::Render(vtkmActor *&plot,
         {
             m_images[i].m_data_string = render_type + " <\n";
             GetModelInfo(*plot,i);
+            //paviz_running_prediction += m_images[i].m_model_data[i].m_data_string = render_type + " <\n";
+            
         }
+        //g_paviz->estimate_render(paviz_running_prediction);
 
         //---------------------------------------------------------------------
         {// open block for RENDER_PAINT Timer
         //---------------------------------------------------------------------
             ALPINE_BLOCK_TIMER(RENDER_PAINT);
+#ifdef PARALLEL
+            g_paviz->start_profiling();
+#endif
             for(int i = 0; i < image_count; ++i)
             {
                 m_images[i].m_canvas->Clear();
@@ -1101,6 +1132,15 @@ Renderer::Render(vtkmActor *&plot,
                               m_images[i].m_camera);
                 m_images[i].m_data_string += m_renderer->LogString;
             }
+#ifdef PARALLEL
+            // End paviz time
+            const char *nodeid;
+            double runtime = g_paviz->end_profiling(&nodeid);
+            g_running_render_time += runtime;
+            std::cerr << "TIME " << nodeid << " render done " << now_ms() << std::endl;
+            std::cout << "RRR <alpine> " << nodeid << " render time took " << runtime << " sec" << std::endl;
+            std::cout << "RRR <alpine> " << nodeid << " total render time now at " << g_running_render_time << " sec" << std::endl;
+#endif
         //---------------------------------------------------------------------
         } // close block for RENDER_PAINT Timer
         //---------------------------------------------------------------------
@@ -1448,6 +1488,8 @@ Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
     model_data["image_height"] = image_height;
     model_data["image_width"] = image_width;
 
+    /* [SL] Derive "prediction" from these metrics. */
+    //model_data["pred_time"] = ;
 
     bool is_structured = VTKMDataSetInfo::IsStructured(actor, topo_dims);
     if(is_structured)

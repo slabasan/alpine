@@ -62,6 +62,7 @@
 #include <alpine_png_encoder.hpp>
 #include <alpine_web_interface.hpp>
 #include <alpine_logging.hpp>
+#include <Controller.hpp> /* paviz */
 
 
 // mpi related includes
@@ -104,6 +105,11 @@ enum RendererType
     RAYTRACER,
     RASTERIZER
 };
+
+#ifdef PARALLEL
+static Controller *g_paviz;
+static double g_running_render_time = 0.0;
+#endif
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------

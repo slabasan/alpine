@@ -59,6 +59,8 @@ include_directories(${PROJECT_SOURCE_DIR}/alpine/)
 include_directories(${PROJECT_BINARY_DIR}/alpine/)
 include_directories(${PROJECT_SOURCE_DIR}/alpine/utils)
 include_directories(${PROJECT_SOURCE_DIR}/alpine/pipelines)
+include_directories(/usr/workspace/wsa/labasan1/alpine-paviz/libpowerawarevis-alpine/src)
+include_directories(/usr/workspace/wsa/labasan1/alpine-paviz/libmsr/INSTALL/include)
 
 include_directories(${CONDUIT_INCLUDE_DIRS})
 

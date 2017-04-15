@@ -931,6 +931,10 @@ VTKMPipeline::RenderPlot(const int plot_id,
         {
             m_render_mode = RAYTRACER;
         }
+        else if(render_options["renderer"].as_string() == "rasterizer")
+        {
+            m_render_mode = RASTERIZER;
+        }
         else
         {
             ALPINE_INFO( "VTK-m Pipeline: unknown renderer "

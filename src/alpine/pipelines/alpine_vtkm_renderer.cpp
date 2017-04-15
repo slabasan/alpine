@@ -200,6 +200,10 @@ Renderer::InitRendering(int plot_dims)
     {   
         m_renderer = new vtkmRayTracer();
     }
+    else if(m_render_type == RASTERIZER)
+    {   
+        m_renderer = new vtkmRasterizer();
+    }
   
     if(m_renderer == NULL)
     {
@@ -210,23 +214,17 @@ Renderer::InitRendering(int plot_dims)
     // check to see how many images we have this render
     //
     int image_count = CountImages();
-    if(m_render_type == VOLUME || m_render_type == RAYTRACER)
+    m_images.resize(image_count);
+    for(int i = 0; i < image_count; ++i)
     {
-        m_images.resize(image_count);
-        for(int i = 0; i < image_count; ++i)
-        {
-            m_images[i].m_canvas = new vtkmCanvasRayTracer(1,1);
-            m_images[i].m_canvas->SetBackgroundColor(m_bg_color);
+        m_images[i].m_canvas = new vtkmCanvasRayTracer(1,1);
 
-            if(m_images[i].m_canvas == NULL)
-            {
-                ALPINE_ERROR("vtkmCanvas was not created.");
-            }
+        m_images[i].m_canvas->SetBackgroundColor(m_bg_color);
+
+        if(m_images[i].m_canvas == NULL)
+        {
+            ALPINE_ERROR("vtkmCanvas was not created.");
         }
-    }
-    else
-    {
-        //TODO: setup any other type of canvas we have
     }
 
 }

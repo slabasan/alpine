@@ -54,6 +54,7 @@
 #include <vtkm/rendering/Actor.h>
 #include <vtkm/rendering/CanvasRayTracer.h>
 #include <vtkm/rendering/MapperRayTracer.h>
+#include <vtkm/rendering/MapperRasterizer.h>
 #include <vtkm/rendering/MapperVolume.h>
 #include <vtkm/cont/DeviceAdapter.h>
 #include <conduit.hpp>
@@ -99,7 +100,8 @@ struct VTKMVisibility
 enum RendererType 
 {
     VOLUME,
-    RAYTRACER 
+    RAYTRACER,
+    RASTERIZER
 };
 
 //-----------------------------------------------------------------------------
@@ -119,6 +121,7 @@ public:
       typedef vtkm::rendering::Mapper                          vtkmMapper;
       typedef vtkm::rendering::MapperVolume                    vtkmVolumeRenderer;
       typedef vtkm::rendering::MapperRayTracer                 vtkmRayTracer;
+      typedef vtkm::rendering::MapperRasterizer                vtkmRasterizer;
       typedef vtkm::Vec<vtkm::Float32,3>                       vtkmVec3f;
       Renderer();
 

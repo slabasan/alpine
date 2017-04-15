@@ -566,9 +566,15 @@ Renderer::~Renderer()
     char host_name[host_leng];
     gethostname(host_name, host_leng);
 
-    std::string hostname(host_name);
-    std::string file_name = hostname + ".log";
+#ifdef PARALLEL
+    std::stringstream ss;
+    ss<<host_name<<"_"<<m_rank;
+    std::string hostname(ss.str());
 
+#else
+    std::string hostname(host_name);
+#endif
+    std::string file_name = hostname + ".log";
     std::ofstream log_file;
     log_file.open(file_name, std::fstream::app);
     log_file<<m_log_stream.str();
@@ -1279,6 +1285,9 @@ Renderer::SetupCameras(const std::string image_name)
             v0[0] = cos(tr) * sin(pr);
             v0[1] = sin(tr) * sin(pr);
             v0[2] = cos(pr);
+            v0[0] += 0.0001;
+            v0[1] += 0.0001;
+            v0[2] += 0.0001;
             std::stringstream ss;
             ss<<phi<<"_"<<theta<<"_";
             prefixes[p * num_theta + t] = ss.str();

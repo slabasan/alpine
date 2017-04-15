@@ -1063,10 +1063,11 @@ Renderer::Render(vtkmActor *&plot,
         //---------------------------------------------------------------------
         } // close block for RENDER_PAINT Timer
         //---------------------------------------------------------------------
-        
+         
         //Save the image.
         for(int i = 0; i < image_count; ++i)
         {
+          std::cout<<"**** "<<i<<"\n";
 #ifdef PARALLEL
 
             const float *result_color_buffer = NULL;
@@ -1170,6 +1171,7 @@ Renderer::Render(vtkmActor *&plot,
             if(image_file_name != NULL) SaveImage(m_images[i].m_image_name.c_str());
         }// for each image
 
+          std::cout<<"****&&&& "<<"\n";
         for(int i = 0; i < image_count; ++i)
         {
             m_images[i].m_data_string += render_type + " >\n";

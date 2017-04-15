@@ -1296,7 +1296,7 @@ Renderer::SetupCameras(const std::string image_name)
         vtkm::Normalize(view_dir);
         vtkm::Normalize(up);
         std::string flag;
-        if(view_dir == up || view_dir == -up)
+        //if(view_dir == up || view_dir == -up)
         {
           //
           // if view == up then this will cause nans in the 

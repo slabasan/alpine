@@ -1007,7 +1007,7 @@ Renderer::Render(vtkmActor *&plot,
 
         std::string render_type = "ray_tracer"; 
         if(m_render_type == VOLUME) render_type = "volume";
-
+        else if( m_render_type = RASTERIZER) render_type = "rasterizer";
 #ifdef PARALLEL
         SetParallelPlotExtents(plot);
         
@@ -1065,7 +1065,6 @@ Renderer::Render(vtkmActor *&plot,
         //Save the image.
         for(int i = 0; i < image_count; ++i)
         {
-          std::cout<<"**** "<<i<<"\n";
 #ifdef PARALLEL
 
             const float *result_color_buffer = NULL;
@@ -1169,7 +1168,6 @@ Renderer::Render(vtkmActor *&plot,
             if(image_file_name != NULL) SaveImage(m_images[i].m_image_name.c_str());
         }// for each image
 
-          std::cout<<"****&&&& "<<"\n";
         for(int i = 0; i < image_count; ++i)
         {
             m_images[i].m_data_string += render_type + " >\n";

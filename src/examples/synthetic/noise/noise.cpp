@@ -221,6 +221,7 @@ struct DataSet
    const int  m_cell_size;
    const int  m_point_size;
    double    *m_nodal_scalars;
+   double    *m_nodal2_scalars;
    double    *m_zonal_scalars;
    double     m_spacing[3];
    double     m_origin[3];
@@ -244,6 +245,7 @@ struct DataSet
 
    {
      m_nodal_scalars = new double[m_point_size]; 
+     m_nodal2_scalars = new double[m_point_size]; 
      m_zonal_scalars = new double[m_cell_size]; 
    }    
 
@@ -258,6 +260,12 @@ struct DataSet
      const int offset = z * m_point_dims[0] * m_point_dims[1] +
                         y * m_point_dims[0] + x;
      m_nodal_scalars[offset] = val;
+   } 
+   inline void SetPoint2(const double &val, const int &x, const int &y, const int &z)
+   {
+     const int offset = z * m_point_dims[0] * m_point_dims[1] +
+                        y * m_point_dims[0] + x;
+     m_nodal2_scalars[offset] = val;
    } 
 
    inline void SetCell(const double &val, const int &x, const int &y, const int &z)
@@ -290,6 +298,10 @@ struct DataSet
       node["fields/nodal_noise/type"]        = "scalar";
       node["fields/nodal_noise/topology"]    = "mesh";
       node["fields/nodal_noise/values"].set_external(m_nodal_scalars);
+      node["fields/nodal2_noise/association"] = "vertex";
+      node["fields/nodal2_noise/type"]        = "scalar";
+      node["fields/nodal2_noise/topology"]    = "mesh";
+      node["fields/nodal2_noise/values"].set_external(m_nodal2_scalars);
    }
 
    void Print()
@@ -305,6 +317,7 @@ struct DataSet
    ~DataSet()
    {
      if(m_nodal_scalars) delete[] m_nodal_scalars; 
+     if(m_nodal_scalars) delete[] m_nodal2_scalars; 
      if(m_zonal_scalars) delete[] m_zonal_scalars; 
    }
 private:
@@ -422,8 +435,10 @@ int main(int argc, char** argv)
 
   struct osn_context *ctx_zonal;
   struct osn_context *ctx_nodal;
+  struct osn_context *ctx_nodal2;
   open_simplex_noise(77374, &ctx_nodal);
   open_simplex_noise(59142, &ctx_zonal);
+  open_simplex_noise(82031, &ctx_nodal2);
   
   double time = 0;
   //
@@ -460,8 +475,10 @@ int main(int argc, char** argv)
           double coord[4];
           data_set.GetCoord(x,y,z,coord);
           coord[3] = time;
-          double val = open_simplex_noise4(ctx_zonal, coord[0], coord[1], coord[2], coord[3]);
+          double val = open_simplex_noise4(ctx_nodal, coord[0], coord[1], coord[2], coord[3]);
+          double val2 = open_simplex_noise4(ctx_nodal2, coord[0], coord[1], coord[2], coord[3]);
           data_set.SetPoint(val,x,y,z);
+          data_set.SetPoint2(val2,x,y,z);
         }
 
         time += options.m_time_delta;

@@ -68,7 +68,7 @@
 
 #include <vtkm/rendering/raytracing/Camera.h>
 
-#define DEFAULT_VR_SAMPLES 200
+#define DEFAULT_VR_SAMPLES 1000
 
 using namespace std;
 using namespace conduit;
@@ -1013,7 +1013,7 @@ Renderer::Render(vtkmActor *&plot,
 
         std::string render_type = "ray_tracer"; 
         if(m_render_type == VOLUME) render_type = "volume";
-        else if( m_render_type = RASTERIZER) render_type = "rasterizer";
+        else if( m_render_type == RASTERIZER) render_type = "rasterizer";
 #ifdef PARALLEL
         SetParallelPlotExtents(plot);
         

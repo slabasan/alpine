@@ -67,6 +67,7 @@
 #include <vtkm/cont/DataSet.h>
 #include <vtkm/cont/DataSetBuilderRectilinear.h>
 #include <vtkm/rendering/Actor.h>
+#include <vtkm/rendering/FilterIso.h>
 
 #ifdef VTKM_CUDA
 #include <vtkm/cont/cuda/ChooseCudaDevice.h>
@@ -177,15 +178,19 @@ VTKMPipeline::DataAdapter::BlueprintToVTKmDataSet (const Node &node,
     {
         ALPINE_ERROR("Unsupported topology/type:" << mesh_type);
     }
-    
-    // add var
-    AddVariableField(field_name,
-                     n_field,
-                     topo_name,
-                     neles,
-                     nverts,
-                     result);
-   
+       
+    const std::vector<std::string> field_names = node["fields"].child_names();;
+    for (int i = 0; i < node["fields"].number_of_children(); ++i)
+    {
+        const Node &field_node = node["fields"].child(i);
+        // add var
+        AddVariableField(field_names[i],
+                         field_node,
+                         topo_name,
+                         neles,
+                         nverts,
+                         result);
+    } 
     return result;
 }
 
@@ -791,6 +796,7 @@ VTKMPipeline::Publish(const conduit::Node &data)
 void
 VTKMPipeline::Execute(const conduit::Node &actions)
 {
+            actions.print();
     //
     // Loop over the actions
     //
@@ -810,13 +816,14 @@ VTKMPipeline::Execute(const conduit::Node &actions)
         {
             AddPlot(action);
         }
-        else if (action["action"].as_string() == "add_filter")
-        {
-            ALPINE_INFO("VTKm add_filter not implemented");
-        }
         else if (action["action"].as_string() == "draw_plots")
         {
             DrawPlots();
+        }
+        else if (action["action"].as_string() == "add_filter")
+        {
+            ALPINE_INFO("VTKm add_filter not implemented");
+            AddFilter(action);
         }
         else
         {
@@ -826,6 +833,54 @@ VTKMPipeline::Execute(const conduit::Node &actions)
 }
 //-----------------------------------------------------------------------------
 
+void
+VTKMPipeline::AddFilter(const conduit::Node &action)
+{
+    if(!action.has_path("filter_type"))
+    {
+        ALPINE_ERROR("Error: add_filter must specify \"filter_type\"");
+    }
+    if(action["filter_type"].as_string() != "isosurface")
+    {
+        ALPINE_ERROR("Error: add_filter only isosurface supported");
+    }
+
+    std::string map_field;
+    if(action.has_path("map_field"))
+    {
+        map_field  = action["map_field"].as_string();
+    }
+    else
+    {
+        map_field = m_plots.at(0).m_var_name;
+    }
+    const double iso_value = action["iso_value"].as_float64();
+     
+    try
+    {
+        vtkm::rendering::FilterIso iso; 
+        iso.SetIsoValue(iso_value);
+        iso.SetMapField(map_field);
+        vtkmDataSet res = iso.Execute(*m_plots.at(0).m_data_set, 
+                                      m_plots.at(0).m_var_name);
+        *m_plots.at(0).m_data_set = res;
+        m_plots.at(0).m_data_set->PrintSummary(std::cout);
+
+        m_plots.at(0).m_var_name = map_field;
+        vtkm::rendering::ColorTable color_table("Spectral");
+
+        delete m_plots.at(0).m_plot;
+        m_plots.at(0).m_plot = new vtkmActor(m_plots.at(0).m_data_set->GetCellSet(),
+                                             m_plots.at(0).m_data_set->GetCoordinateSystem(),
+                                             m_plots.at(0).m_data_set->GetField(map_field),
+                                             color_table);
+    }
+    catch (vtkm::cont::Error error) 
+    {
+        ALPINE_ERROR("AddFilter Got the unexpected error: " << error.GetMessage() << std::endl);
+    }
+    
+}
 void
 VTKMPipeline::AddPlot(const conduit::Node &action)
 {

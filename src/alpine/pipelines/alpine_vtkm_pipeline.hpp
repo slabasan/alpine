@@ -174,6 +174,7 @@ private:
     int cuda_device;
     // actions
     void            AddPlot(const conduit::Node &action);
+    void            AddFilter(const conduit::Node &action);
 };
 
 //-----------------------------------------------------------------------------

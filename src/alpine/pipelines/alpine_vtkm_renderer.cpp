@@ -67,7 +67,7 @@
 #include <alpine_vtkm_dataset_info.hpp>
 
 #include <vtkm/rendering/raytracing/Camera.h>
-
+#include <vtkm/Transform3d.h>
 #define DEFAULT_VR_SAMPLES 1000
 
 using namespace std;
@@ -1268,8 +1268,6 @@ Renderer::SetupCameras(const std::string image_name)
     totalExtent[2] = vtkm::Float32(m_spatial_bounds.Z.Length());   
     vtkm::Float32 radius = vtkm::Magnitude(totalExtent) * 3.5 / 2.0;   
     
-    std::vector<vtkm::Vec<vtkm::Float32,3> > verts(images);
-    std::vector<std::string> prefixes(images);
     const double pi = 3.141592653589793;
     double phi_inc = 180.0 / double(num_phi);
     double theta_inc = 360.0 / double(num_theta);
@@ -1277,67 +1275,48 @@ Renderer::SetupCameras(const std::string image_name)
     {
         for(int t = 0; t < num_theta; ++t)
         {
-            double phi  =  phi_inc * p;
-            double theta = -180 + theta_inc * t;
-            double pr = (pi * phi) / 180.0;
-            double tr = (pi * theta) / 180.0;
-            vtkm::Vec<vtkm::Float32,3> v0;
-            v0[0] = cos(tr) * sin(pr);
-            v0[1] = sin(tr) * sin(pr);
-            v0[2] = cos(pr);
-            v0[0] += 0.0001;
-            v0[1] += 0.0001;
-            v0[2] += 0.0001;
+            float phi  =  phi_inc * p;
+            float theta = -180 + theta_inc * t;
+
+            const int i = p * num_theta + t;
+
+            m_images[i].m_camera = m_vtkm_camera;
+
+            //
+            //  spherical coords start (r=1, theta = 0, phi = 0)
+            //  (x = 0, y = 0, z = 1)
+            //  up is the x+, and right is y+
+            //
+
+            vtkmVec3f pos(0.f,0.f,1.f);
+            vtkmVec3f up(1.f,0.f,0.f);
+
+            vtkm::Matrix<vtkm::Float32,4,4> phi_rot;  
+            vtkm::Matrix<vtkm::Float32,4,4> theta_rot;  
+            vtkm::Matrix<vtkm::Float32,4,4> rot;  
+
+            phi_rot = vtkm::Transform3DRotateY(phi); 
+            theta_rot = vtkm::Transform3DRotateZ(theta); 
+            rot = vtkm::MatrixMultiply(phi_rot, theta_rot); 
+
+            up = vtkm::Transform3DVector(rot, up);
+            vtkm::Normalize(up);
+            m_images[i].m_camera.SetViewUp(up);
+
+            pos = vtkm::Transform3DPoint(rot, pos);
+            pos = pos * radius + center; 
+            m_images[i].m_camera.SetPosition(pos);
+
             std::stringstream ss;
             ss<<phi<<"_"<<theta<<"_";
-            prefixes[p * num_theta + t] = ss.str();
-            //std::cout<<ss.str()<<"\n";
-            verts[p * num_theta + t] = v0;
+            std::cout<<ss.str()<<"\n";
+            m_images[i].m_image_name = ss.str() + image_name;
+
+            m_images[i].m_camera.SetLookAt(center);
+            this->SetDefaultClippingPlane(m_images[i].m_camera);
         }
     }      
 
-    for(int i =0; i < verts.size(); ++i)
-    {
-        m_images[i].m_camera = m_vtkm_camera;
-        vtkmVec3f pos = verts[i] * radius + center; 
-        vtkmVec3f view_dir = pos - center;
-        vtkmVec3f up = m_vtkm_camera.GetViewUp();
-        vtkm::Normalize(view_dir);
-        vtkm::Normalize(up);
-        std::string flag;
-        //if(view_dir == up || view_dir == -up)
-        {
-          //
-          // if view == up then this will cause nans in the 
-          // view matrix. TODO: this is not the right
-          // way to handle this.
-          //
-          vtkmVec3f up_abs(std::abs(up[0]), std::abs(up[1]), std::abs(up[2]));
-          float max_up = std::max(up_abs[0], std::max(up_abs[1], up_abs[2]));
-          vtkmVec3f perp(up[1], -up[0], 0.f);
-          if(max_up == up_abs[2])
-          {
-              perp[0] = 0.f;
-              perp[1] = up[2];
-              perp[2] = -up[1];
-          }
-          else if(max_up == up_abs[2])
-          {
-              perp[0] = -up[2];
-              perp[1] = 0.f;
-              perp[2] = up[0];
-          }
-          vtkm::Normalize(perp);
-          m_images[i].m_camera.SetViewUp(perp);
-        }
-        m_images[i].m_camera.SetPosition(pos);
-        m_images[i].m_camera.SetLookAt(center);
-        this->SetDefaultClippingPlane(m_images[i].m_camera);
-        m_images[i].m_camera.Print();
-        m_images[i].m_image_name = prefixes[i] + flag + image_name;
-        //std::cout<<m_images[i].m_image_name<<"\n";
-    }
-    
 }
 
 //-----------------------------------------------------------------------------

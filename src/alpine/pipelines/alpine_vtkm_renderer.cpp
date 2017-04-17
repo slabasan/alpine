@@ -110,7 +110,8 @@ Renderer::Renderer(MPI_Comm mpi_comm)
 
     Init();
     NullRendering();
-    m_icet.Init(m_mpi_comm);
+    m_compositor = new IceTCompositor();
+    m_compositor->Init(m_mpi_comm);
 
     MPI_Comm_rank(m_mpi_comm, &m_rank);
     MPI_Comm_size(m_mpi_comm, &m_mpi_size);
@@ -585,7 +586,7 @@ Renderer::~Renderer()
     Cleanup();
 
 #ifdef PARALLEL
-    m_icet.Cleanup();
+    m_compositor->Cleanup();
 #endif
 }
 
@@ -600,7 +601,24 @@ Renderer::SetOptions(const Node &options)
     {
         m_web_stream_enabled = true;
     }
+#ifdef PARALLEL
+    if(options.has_path("compositor"))
+    {
+        m_compositor->Cleanup();
+        delete m_compositor;
+        if(options["compositor"].as_string() == "diy")
+        {
+            m_compositor = new DIYCompositor();
+        }
+        else if(options["compositor"].as_string() == "icet")
+        {
+            m_compositor = new IceTCompositor();
+        }
+        m_compositor->Init(m_mpi_comm);
+    }
+#endif
     
+
     
 }
 //-----------------------------------------------------------------------------
@@ -1030,6 +1048,9 @@ Renderer::Render(vtkmActor *&plot,
                 // Set the backgound color to transparent
                 vtkmColor color = m_images[i].m_canvas->GetBackgroundColor();
                 
+                color.Components[0] = 0.f;
+                color.Components[1] = 0.f;
+                color.Components[2] = 0.f;
                 color.Components[3] = 0.f;
                 m_images[i].m_canvas->SetBackgroundColor(color);
 
@@ -1073,7 +1094,7 @@ Renderer::Render(vtkmActor *&plot,
         {
 #ifdef PARALLEL
 
-            const float *result_color_buffer = NULL;
+            unsigned char *result_color_buffer = NULL;
             //---------------------------------------------------------------------
             {// open block for RENDER_COMPOSITE Timer
             //---------------------------------------------------------------------
@@ -1102,12 +1123,12 @@ Renderer::Render(vtkmActor *&plot,
                 bg_color[3] = m_bg_color.Components[3];
                 if(m_render_type != VOLUME)
                 {   
-                    result_color_buffer = m_icet.Composite(image_width,
-                                                           image_height,
-                                                           input_color_buffer,
-                                                           input_depth_buffer,
-                                                           view_port,
-                                                           bg_color);
+                    result_color_buffer = m_compositor->Composite(image_width,
+                                                                  image_height,
+                                                                  input_color_buffer,
+                                                                  input_depth_buffer,
+                                                                  view_port,
+                                                                  bg_color);
                 }
                 else
                 {    
@@ -1115,11 +1136,11 @@ Renderer::Render(vtkmActor *&plot,
                     // Volume rendering uses a visibility ordering 
                     // by rank instead of a depth buffer
                     //
-                    result_color_buffer = m_icet.Composite(image_width,
-                                                           image_height,
-                                                           input_color_buffer,
-                                                           m_images[i].GetVisOrder(),
-                                                           bg_color);
+                    result_color_buffer = m_compositor->Composite(image_width,
+                                                                  image_height,
+                                                                  input_color_buffer,
+                                                                  m_images[i].GetVisOrder(),
+                                                                  bg_color);
                 }
             
                 gettimeofday(&comp_end, NULL);
@@ -1309,7 +1330,6 @@ Renderer::SetupCameras(const std::string image_name)
 
             std::stringstream ss;
             ss<<phi<<"_"<<theta<<"_";
-            std::cout<<ss.str()<<"\n";
             m_images[i].m_image_name = ss.str() + image_name;
 
             m_images[i].m_camera.SetLookAt(center);

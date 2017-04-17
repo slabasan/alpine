@@ -1017,7 +1017,7 @@ VTKMPipeline::RenderPlot(const int plot_id,
         options["web/stream"] = "true";
         m_renderer->SetOptions(options);
     }
-    
+    m_renderer->SetOptions(render_options);  
     //
     //    Check for camera attributes
     //

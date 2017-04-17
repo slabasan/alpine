@@ -1108,6 +1108,7 @@ Renderer::Render(vtkmActor *&plot,
         }
 #endif
     
+        double paviz_agg_prediction = 0.0;
         for(int i = 0; i < image_count; ++i)
         {
             m_images[i].m_data_string = render_type + " <\n";
@@ -1118,12 +1119,14 @@ Renderer::Render(vtkmActor *&plot,
             float activePixels = m_images[i].m_model_data["active_pixels"];
             float av_samples = m_images[i].m_model_data["samples_per_ray"];
             float dim_x = m_images[i].m_model_data["cell_dim_x"];
-            model_data["pred_time"] = 0.05710758 + av_samples * activePixels * 0.00000000191089373032 + 0.00000000017873584382 * activePixels * double(dim_x);
+            m_images[i].m_model_data["pred_time"] = 0.05710758 + av_samples * activePixels * 0.00000000191089373032 + 0.00000000017873584382 * activePixels * double(dim_x);
 
-            //paviz_running_prediction += m_images[i].m_model_data[i].m_data_string = render_type + " <\n";
+            paviz_agg_prediction += m_images[i].m_model_data["render_time"];
             
         }
-        //g_paviz->estimate_render(paviz_running_prediction);
+#ifdef PARALLEL
+        g_paviz->estimate_render(paviz_agg_prediction);
+#endif
 
         //---------------------------------------------------------------------
         {// open block for RENDER_PAINT Timer

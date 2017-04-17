@@ -1112,6 +1112,14 @@ Renderer::Render(vtkmActor *&plot,
         {
             m_images[i].m_data_string = render_type + " <\n";
             GetModelInfo(*plot,i);
+            /* [SL] Derive "prediction" from these metrics. */
+            //model_data["pred_time"] = ;
+            // Model used in EGPGV paper for volume rendering 
+            float activePixels = m_images[i].m_model_data["active_pixels"];
+            float av_samples = m_images[i].m_model_data["samples_per_ray"];
+            float dim_x = m_images[i].m_model_data["cell_dim_x"];
+            model_data["pred_time"] = 0.05710758 + av_samples * activePixels * 0.00000000191089373032 + 0.00000000017873584382 * activePixels * double(dim_x);
+
             //paviz_running_prediction += m_images[i].m_model_data[i].m_data_string = render_type + " <\n";
             
         }
@@ -1488,8 +1496,6 @@ Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
     model_data["image_height"] = image_height;
     model_data["image_width"] = image_width;
 
-    /* [SL] Derive "prediction" from these metrics. */
-    //model_data["pred_time"] = ;
 
     bool is_structured = VTKMDataSetInfo::IsStructured(actor, topo_dims);
     if(is_structured)

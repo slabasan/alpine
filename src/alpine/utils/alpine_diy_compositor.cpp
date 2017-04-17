@@ -97,6 +97,7 @@ DIYCompositor::Composite(int            width,
     compositor.CompositeVolume(m_diy_comm, m_image, vis_order, bg_color);
     m_image.m_orig_rank = m_rank;
 
+    m_log_stream<<"compositor diy\n";;
     m_log_stream<<compositor.GetTimingString();
 
     if(m_rank == 0)
@@ -127,6 +128,7 @@ DIYCompositor::Composite(int            width,
     compositor.CompositeVolume(m_diy_comm, m_image, vis_order, bg_color);
     m_image.m_orig_rank = m_rank;
 
+    m_log_stream<<"compositor diy\n";;
     m_log_stream<<compositor.GetTimingString();
 
     if(m_rank == 0)
@@ -159,6 +161,7 @@ DIYCompositor::Composite(int width,
     RadixKCompositor compositor;
     compositor.CompositeSurface(m_diy_comm, m_image);
 
+    m_log_stream<<"compositor diy\n";;
     m_log_stream<<compositor.GetTimingString();
 
     if(m_rank == 0)
@@ -187,6 +190,7 @@ DIYCompositor::Composite(int width,
     RadixKCompositor compositor;
     compositor.CompositeSurface(m_diy_comm, m_image);
 
+    m_log_stream<<"compositor diy\n";;
     m_log_stream<<compositor.GetTimingString();
 
     if(m_rank == 0)

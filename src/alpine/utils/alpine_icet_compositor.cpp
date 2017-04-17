@@ -290,6 +290,7 @@ IceTCompositor::GetTimings()
 {
   double time;
   icetGetDoublev(ICET_COLLECT_TIME, &time);
+  m_log_stream<<"compositor icet\n";;
   m_log_stream<<"icet_collect_time"<<" "<<time<<"\n";
 
   icetGetDoublev(ICET_COMPOSITE_TIME, &time);

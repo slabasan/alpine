@@ -282,6 +282,7 @@ private:
     PNGEncoder              m_png_data;
 
     std::stringstream       m_log_stream;
+    bool                    m_rank_0_log;
 //-----------------------------------------------------------------------------
 // private vars for MPI case
 //-----------------------------------------------------------------------------

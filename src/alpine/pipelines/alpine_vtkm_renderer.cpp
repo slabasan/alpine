@@ -94,6 +94,7 @@ GetVTKMPointer(vtkm::cont::ArrayHandle<T> &handle)
 
 Renderer::Renderer()
 {   
+    m_rank_0_log = false;
     Init();
     NullRendering();
     m_rank  = 0; 
@@ -566,20 +567,26 @@ Renderer::~Renderer()
     size_t host_leng = 64;
     char host_name[host_leng];
     gethostname(host_name, host_leng);
-
+    bool write_log = true;
+    if(m_rank_0_log && m_rank != 0)
+    {
+      write_log = false;  
+    };
 #ifdef PARALLEL
     std::stringstream ss;
     ss<<host_name<<"_"<<m_rank;
     std::string hostname(ss.str());
-
 #else
     std::string hostname(host_name);
 #endif
     std::string file_name = hostname + ".log";
-    std::ofstream log_file;
-    log_file.open(file_name, std::fstream::app);
-    log_file<<m_log_stream.str();
-    log_file.close(); 
+    if(write_log)
+    {
+        std::ofstream log_file;
+        log_file.open(file_name, std::fstream::app);
+        log_file<<m_log_stream.str();
+        log_file.close(); 
+    }
 
     ALPINE_BLOCK_TIMER(RENDERER_ON_DESTROY);
     
@@ -615,6 +622,13 @@ Renderer::SetOptions(const Node &options)
             m_compositor = new IceTCompositor();
         }
         m_compositor->Init(m_mpi_comm);
+    }
+    if(options.has_path("root_log"))
+    {
+      if(options["root_log"].as_string() == "true")
+      {
+        m_rank_0_log = true;
+      }
     }
 #endif
     
@@ -1148,10 +1162,10 @@ Renderer::Render(vtkmActor *&plot,
                 double elapsed_time = (double)(comp_end.tv_sec - comp_start.tv_sec) + 
                                       ((double)(comp_end.tv_usec - comp_start.tv_usec))/1000000.;
               
+                m_images[i].m_data_string += m_compositor->GetLogString();
                 std::stringstream cmp;
                 cmp<<"composite_time"<<" "<<elapsed_time<<"\n";
                 m_images[i].m_data_string += cmp.str();
-                
             //---------------------------------------------------------------------
             }// close block for RENDER_COMPOSITE Timer
             //---------------------------------------------------------------------

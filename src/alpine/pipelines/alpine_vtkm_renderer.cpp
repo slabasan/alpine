@@ -1301,7 +1301,7 @@ Renderer::SetupCameras(const std::string image_name)
     totalExtent[0] = vtkm::Float32(m_spatial_bounds.X.Length());   
     totalExtent[1] = vtkm::Float32(m_spatial_bounds.Y.Length());   
     totalExtent[2] = vtkm::Float32(m_spatial_bounds.Z.Length());   
-    vtkm::Float32 radius = vtkm::Magnitude(totalExtent) * 3.5 / 2.0;   
+    vtkm::Float32 radius = vtkm::Magnitude(totalExtent) * 2.5 / 2.0;   
     
     const double pi = 3.141592653589793;
     double phi_inc = 180.0 / double(num_phi);

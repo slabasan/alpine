@@ -97,7 +97,7 @@ struct Redistribute
         
         diy::BlockID dest = proxy.out_link().target(i); 
         outgoing[dest].SubsetFrom(block->m_image, sub_image_bounds); 
-        std::cout<<outgoing[dest].ToString()<<"\n";
+        //std::cout<<outgoing[dest].ToString()<<"\n";
       } //for
 
       typename std::map<diy::BlockID,Image>::iterator it;
@@ -128,9 +128,9 @@ struct Redistribute
 
       block->m_image.Swap(incoming[start]);
       block->m_image.CompositeBackground(m_bg_color);
-      std::stringstream ss;
-      ss<<rank<<"_part.png";
-      block->m_image.Save(ss.str());
+      //std::stringstream ss;
+      //ss<<rank<<"_part.png";
+      //block->m_image.Save(ss.str());
     } // else if
     else
     {

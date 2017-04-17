@@ -48,6 +48,7 @@
 #include <iostream>
 #include <conduit.hpp>
 #include <sstream>
+#include <stdlib.h>
 
 #ifdef PARALLEL
 #include <mpi.h>
@@ -59,18 +60,20 @@ struct Options
   double m_spacing[3];
   int    m_time_steps;
   double m_time_delta;
+  bool   m_imbalance;
   Options()
     : m_dims{32,32,32},
       m_time_steps(10),
-      m_time_delta(0.5)
+      m_time_delta(0.5),
+      m_imbalance(false)
   {
     SetSpacing();
   }
   void SetSpacing()
   {
-    m_spacing[0] = 10. / double(m_dims[0]);
-    m_spacing[1] = 10. / double(m_dims[1]);
-    m_spacing[2] = 10. / double(m_dims[2]);
+    m_spacing[0] = .01;
+    m_spacing[1] = .01;
+    m_spacing[2] = .01;
   }
   void Parse(int argc, char** argv)
   {
@@ -107,6 +110,10 @@ struct Options
         time_delta= GetArg(argv[i]); 
         m_time_delta = stof(time_delta); 
       }
+      else if(contains(argv[i], "--imbalance"))
+      {
+        m_imbalance = true;
+      }
       else
       {
         Usage(argv[i]);
@@ -134,11 +141,17 @@ struct Options
   }
   void Print() const
   {
+    std::string imbalance("off");
+    if(m_imbalance)
+    {
+      imbalance = "on";
+    }
     std::cout<<"======== Noise Options =========\n";
     std::cout<<"dims       : ("<<m_dims[0]<<", "<<m_dims[1]<<", "<<m_dims[2]<<")\n"; 
     std::cout<<"spacing    : ("<<m_spacing[0]<<", "<<m_spacing[1]<<", "<<m_spacing[2]<<")\n"; 
     std::cout<<"time steps : "<<m_time_steps<<"\n"; 
     std::cout<<"time delta : "<<m_time_delta<<"\n"; 
+    std::cout<<"imbalance  : "<<imbalance<<"\n"; 
     std::cout<<"================================\n";
   }
 
@@ -180,6 +193,21 @@ struct Options
 	}
 };
 
+float halton(const int &sampleNum)
+{
+  //generate base2 halton
+  float  x = 0.0f;
+  float  xadd = 1.0f;
+  unsigned int b2 = 1 + sampleNum;
+  while (b2 != 0)
+  {
+     xadd *= 0.5f;
+     if ((b2 & 1) != 0)
+     x += xadd;
+     b2 >>= 1;
+  }
+  return x;
+}
 
 struct SpatialDivision
 {
@@ -226,6 +254,7 @@ struct DataSet
    double     m_spacing[3];
    double     m_origin[3];
    double     m_time_step;
+   double     m_imbalance;
 
    DataSet(const Options &options, const SpatialDivision &div)
      : m_cell_dims{div.m_maxs[0] - div.m_mins[0] + 1, 
@@ -241,19 +270,25 @@ struct DataSet
                  options.m_spacing[2]},
        m_origin{0. + double(div.m_mins[0]) * m_spacing[0],
                 0. + double(div.m_mins[1]) * m_spacing[1],
-                0. + double(div.m_mins[2]) * m_spacing[2]}
+                0. + double(div.m_mins[2]) * m_spacing[2]},
+       m_imbalance(1.)
 
    {
      m_nodal_scalars = new double[m_point_size]; 
      m_nodal2_scalars = new double[m_point_size]; 
      m_zonal_scalars = new double[m_cell_size]; 
    }    
+    
+   void SetImbalanceFactor(double imbalance)
+   {
+      m_imbalance = imbalance;
+   }
 
    inline void GetCoord(const int &x, const int &y, const int &z, double *coord)
    {
-      coord[0] = m_origin[0] + m_spacing[0] * double(x); 
-      coord[1] = m_origin[1] + m_spacing[1] * double(y); 
-      coord[2] = m_origin[2] + m_spacing[2] * double(z); 
+      coord[0] = m_origin[0] + m_spacing[0] * double(x) * m_imbalance; 
+      coord[1] = m_origin[1] + m_spacing[1] * double(y) * m_imbalance; 
+      coord[2] = m_origin[2] + m_spacing[2] * double(z) * m_imbalance; 
    }  
    inline void SetPoint(const double &val, const int &x, const int &y, const int &z)
    {
@@ -375,9 +410,9 @@ void Init(SpatialDivision &div, const Options &options)
         for(int i = 0; i < avail; ++i)
         {
           SpatialDivision empty;
-          empty.m_maxs[0] = 0;
-          empty.m_maxs[1] = 0;
-          empty.m_maxs[2] = 0;
+          //empty.m_maxs[0] = 0;
+          //empty.m_maxs[1] = 0;
+          //empty.m_maxs[2] = 0;
           divs.push_back(empty);
         }
         if(rank == 0)
@@ -399,8 +434,9 @@ void Init(SpatialDivision &div, const Options &options)
   }
 
   div = divs.at(rank);
-#endif
+#else
   options.Print();
+#endif
 }
 
 void Finalize()
@@ -427,7 +463,19 @@ int main(int argc, char** argv)
 
   Init(div, options);
   DataSet data_set(options, div); 
-
+  if(options.m_imbalance)
+  {
+    int sample = 0;
+#ifdef PARALLEL
+    int comm_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    sample= comm_size + rank;
+#endif
+    float factor = halton(sample);
+    data_set.SetImbalanceFactor(factor *50.f);
+  }
   double spatial_extents[3];
   spatial_extents[0] = options.m_spacing[0] * options.m_dims[0] + 1;
   spatial_extents[1] = options.m_spacing[1] * options.m_dims[1] + 1;

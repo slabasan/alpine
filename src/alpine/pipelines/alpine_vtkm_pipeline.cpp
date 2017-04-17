@@ -273,7 +273,7 @@ void CreateExplicitArrays(vtkm::cont::ArrayHandle<vtkm::UInt8> &shapes,
     const vtkm::UInt8 shape_value = shape_id;
     const vtkm::IdComponent indices_value = indices;
 #ifdef ALPINE_USE_OPENMP
-    #pragma omp parrallel for
+//#pragma omp parrallel for
 #endif
     for (int i = 0; i < num_shapes; ++i)
     {

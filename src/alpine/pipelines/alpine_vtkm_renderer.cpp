@@ -67,7 +67,7 @@
 #include <alpine_vtkm_dataset_info.hpp>
 
 #include <vtkm/rendering/raytracing/Camera.h>
-#include <vtkm/Transform3d.h>
+#include <vtkm/Transform3D.h>
 #define DEFAULT_VR_SAMPLES 1000
 
 using namespace std;

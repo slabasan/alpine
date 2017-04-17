@@ -184,7 +184,7 @@ private:
         vtkmCamera  m_camera;
         vtkmCanvas *m_canvas;
         std::string m_image_name;
-        std::map<std::string,float>  m_model_data;
+        std::map<std::string,double>  m_model_data;
         std::string m_data_string;
 
         ImageData()

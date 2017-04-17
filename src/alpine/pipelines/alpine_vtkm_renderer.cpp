@@ -1429,7 +1429,7 @@ void
 Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
 {
     
-    std::map<std::string,float> &model_data = m_images.at(image_num).m_model_data;
+    std::map<std::string,double> &model_data = m_images.at(image_num).m_model_data;
     model_data.clear();
     std::stringstream ss;
     int topo_dims;
@@ -1480,7 +1480,9 @@ Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
         model_data["point_dim_z"] = point_dims[2];
 
     }
-
+    vtkm::Id num_cells = VTKMDataSetInfo::GetNumberOfCells(actor.GetCells());
+    ss<<"num_cells"<<sep<<num_cells<<"\n";
+    model_data["num_cells"] = num_cells;
     vtkm::rendering::raytracing::Camera r_cam;
     vtkmCanvasRayTracer *rtc = static_cast<vtkmCanvasRayTracer*>(canvas);
     if(rtc == NULL) ALPINE_ERROR("Failed to cast rt canvas");

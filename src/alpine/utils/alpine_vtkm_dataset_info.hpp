@@ -26,6 +26,42 @@ public:
                                                           DefaultHandle,
                                                           DefaultHandle> CartesianArrayHandle;
 //-----------------------------------------------------------------------------
+  static vtkm::Id GetNumberOfCells(const vtkm::cont::DataSet &data_set)
+  {
+    const vtkm::cont::DynamicCellSet cell_set = data_set.GetCellSet();
+    return GetNumberOfCells(cell_set);
+  }
+
+  static vtkm::Id GetNumberOfCells(const vtkm::cont::DynamicCellSet &cell_set)
+  {
+    return cell_set.GetNumberOfCells();
+  }
+//-----------------------------------------------------------------------------
+  static bool IsExplicit(const vtkm::cont::DataSet &data_set)
+  {
+    const vtkm::cont::DynamicCellSet cell_set = data_set.GetCellSet();
+    return IsExplicit(cell_set);
+  }
+
+  static bool IsExplicit(const vtkm::rendering::Actor &actor)
+  {
+    return IsExplicit(actor.GetCells()); 
+  }
+
+  static bool IsExplicit(const vtkm::cont::DynamicCellSet &cell_set)
+  {
+    bool is_explicit = false;
+    if(cell_set.IsSameType(vtkm::cont::CellSetExplicit<>()))
+    {
+      is_explicit = true;
+    }
+    else if(cell_set.IsSameType(vtkm::cont::CellSetSingleType<>()))
+    {
+      is_explicit = true;
+    }
+    return is_explicit;
+  }
+//-----------------------------------------------------------------------------
   static bool IsStructured(const vtkm::cont::DataSet &data_set, int &topo_dims)
   {
     const vtkm::cont::DynamicCellSet cell_set = data_set.GetCellSet();

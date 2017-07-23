@@ -265,6 +265,7 @@ private:
 
     vtkmColor               m_bg_color;
     vtkm::Bounds            m_spatial_bounds; 
+    vtkm::Bounds            m_local_bounds; 
     RendererType            m_render_type;
     RenderParams            m_last_render;
   

@@ -932,6 +932,7 @@ Renderer::Render(vtkmActor *&plot,
     ALPINE_BLOCK_TIMER(RENDER)
     try
     {
+        m_local_bounds = plot->GetSpatialBounds(); 
         PNGEncoder png;
         // Set the Default camera position
         SetDefaultCameraView(plot);
@@ -1480,6 +1481,17 @@ Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
         model_data["point_dim_z"] = point_dims[2];
 
     }
+    float spatial_dim_x = m_local_bounds.X.Max - m_local_bounds.X.Min;
+    float spatial_dim_y = m_local_bounds.Y.Max - m_local_bounds.Y.Min;
+    float spatial_dim_z = m_local_bounds.Z.Max - m_local_bounds.Z.Min;
+    ss<<"spatial_dim_x"<<sep<<spatial_dim_x<<"\n";
+    ss<<"spatial_dim_y"<<sep<<spatial_dim_y<<"\n";
+    ss<<"spatial_dim_z"<<sep<<spatial_dim_z<<"\n";
+    
+    model_data["spatial_dim_x"] = spatial_dim_x;
+    model_data["spatial_dim_y"] = spatial_dim_y;
+    model_data["spatial_dim_z"] = spatial_dim_z;
+     
     vtkm::Id num_cells = VTKMDataSetInfo::GetNumberOfCells(actor.GetCells());
     ss<<"num_cells"<<sep<<num_cells<<"\n";
     model_data["num_cells"] = num_cells;

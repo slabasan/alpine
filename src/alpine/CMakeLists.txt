@@ -211,6 +211,7 @@ install(TARGETS alpine
 ################################################
 # Build Parallel (MPI) version of alpine
 ################################################
+message(STATUS "%%% ${MPI_FOUND}")
 if(MPI_FOUND)
     set(alpine_par_sources utils/alpine_icet_compositor.cpp
                            utils/alpine_diy_compositor.cpp
@@ -226,8 +227,8 @@ if(MPI_FOUND)
                            utils/diy_compositing/alpine_diy_direct_send.hpp
                            utils/diy_compositing/alpine_diy_radix_k.hpp)
     
-    set(alpine_par_sources utils/alpine_icet_compositor.cpp)
-    set(alpine_par_headers utils/alpine_icet_compositor.hpp)
+    #set(alpine_par_sources utils/alpine_icet_compositor.cpp)
+    #set(alpine_par_headers utils/alpine_icet_compositor.hpp)
 
     if(VTKM_FOUND)
         # we need to set compiler flags for the MPI case

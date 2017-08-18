@@ -108,7 +108,9 @@ enum RendererType
 
 #ifdef PARALLEL
 static Controller *g_paviz;
+#if 0
 static double g_running_render_time = 0.0;
+#endif
 #endif
 
 //-----------------------------------------------------------------------------

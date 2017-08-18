@@ -474,7 +474,7 @@ int main(int argc, char** argv)
     sample= comm_size + rank;
 #endif
     float factor = halton(sample);
-    data_set.SetImbalanceFactor(factor *50.f);
+    data_set.SetImbalanceFactor(factor *15.f);
   }
   double spatial_extents[3];
   spatial_extents[0] = options.m_spacing[0] * options.m_dims[0] + 1;

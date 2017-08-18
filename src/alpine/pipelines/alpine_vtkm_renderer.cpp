@@ -62,6 +62,9 @@
 #include <sys/time.h>
 #include <sys/select.h> /* paviz */
 #include <time.h>       /* paviz */
+#include <math.h>
+#include <iomanip>
+
 // other alpine includes
 #include <alpine_block_timer.hpp>
 #include <alpine_png_encoder.hpp>
@@ -69,6 +72,8 @@
 #include <alpine_vtkm_dataset_info.hpp>
 #include <Controller.hpp> /* paviz */
 
+#include <vtkm/cont/RuntimeDeviceTracker.h>
+#include <vtkm/cont/tbb/DeviceAdapterTBB.h>
 #include <vtkm/rendering/raytracing/Camera.h>
 #include <vtkm/Transform3D.h>
 
@@ -127,15 +132,18 @@ Renderer::Renderer(MPI_Comm mpi_comm)
     m_compositor = new IceTCompositor();
     m_compositor->Init(m_mpi_comm);
 
-    std::cerr << "Creating g_paviz" << std::endl;
-    g_paviz = new Controller(m_mpi_comm);
-
     MPI_Comm_rank(m_mpi_comm, &m_rank);
     MPI_Comm_size(m_mpi_comm, &m_mpi_size);
+
+    std::cerr << "Creating g_paviz, nranks " << m_mpi_size << std::endl;
+    g_paviz = new Controller(m_mpi_comm);
+
+#if 0
     if (((m_mpi_size != 0) && !(m_mpi_size & (m_mpi_size - 1))) == false)
     {
         ALPINE_ERROR("Number of ranks specified is not a power of two");
     }
+#endif
 
     std::cerr << "TIME " << m_rank << " g_paviz created " << now_ms() << std::endl;
 }
@@ -616,7 +624,6 @@ Renderer::~Renderer()
 
 #ifdef PARALLEL
     m_compositor->Cleanup();
-    m_icet.Cleanup();
 
     std::cerr << "DELETE g_paviz" << std::endl;
     delete g_paviz;
@@ -1114,15 +1121,46 @@ Renderer::Render(vtkmActor *&plot,
             m_images[i].m_data_string = render_type + " <\n";
             GetModelInfo(*plot,i);
             /* [SL] Derive "prediction" from these metrics. */
-            //model_data["pred_time"] = ;
-            // Model used in EGPGV paper for volume rendering 
+#if 0 /* Model used in EGPGV paper for volume rendering  */
             float activePixels = m_images[i].m_model_data["active_pixels"];
             float av_samples = m_images[i].m_model_data["samples_per_ray"];
-            float dim_x = m_images[i].m_model_data["cell_dim_x"];
+            //float dim_x = m_images[i].m_model_data["cell_dim_x"];
+            float dim_x = pow(m_images[i].m_model_data["num_cells"], 1./3.);
+            // CHANGE for ray tracing
             m_images[i].m_model_data["pred_time"] = 0.05710758 + av_samples * activePixels * 0.00000000191089373032 + 0.00000000017873584382 * activePixels * double(dim_x);
+            std::cerr << "BBB activePixels=" << activePixels << std::endl;
+            std::cerr << "BBB av_samples=" << av_samples << std::endl;
+            std::cerr << "BBB dim_x=" << dim_x << std::endl;
+#endif
 
-            paviz_agg_prediction += m_images[i].m_model_data["render_time"];
-            
+            /* triangles == num_cells */
+#if 0 /* Perf Model -- Ray Tracer -- Single noise data point */
+            float intersection = 0.003150409 + 0.00000001278109066370 * (m_images[i].m_model_data["active_pixels"] * log2(m_images[i].m_model_data["num_cells"]));
+            float bvh = -0.004918119 + 0.00000037730490477308 * m_images[i].m_model_data["num_cells"];
+            float pixels = 0.0005418444 + 0.00000002577109390591 * m_images[i].m_model_data["active_pixels"];
+            /* Perf Model -- Ray Tracer -- All noise imbalance data points */
+            float intersection = 0.007048865 + 0.00000023128268545421 * (m_images[i].m_model_data["active_pixels"] * log2(m_images[i].m_model_data["num_cells"]));
+            float bvh = -0.4287203 + 0.00000044794190923326 * m_images[i].m_model_data["num_cells"];
+            float pixels = -0.0005006423 + 0.00000086633792631111 * m_images[i].m_model_data["active_pixels"];
+
+            m_images[i].m_model_data["pred_time"] = intersection + bvh + pixels;
+            std::cerr << "img " << i 
+                      << " time " << m_images[i].m_model_data["pred_time"]
+                      << " ap " << std::fixed << m_images[i].m_model_data["active_pixels"]
+                      << " ncells " << m_images[i].m_model_data["num_cells"]
+                      << std::endl;
+#endif
+
+            // 2017-08-16 Ray Tracer Multiple R-sq=0.982
+            // intersection: y ~ 0.01088794 + 0.00000000223050339041 * I(active_pixels * log2(triangles)) 
+            // bvh: y ~ -0.003422768 + 0.00000002348995072182 * triangles 
+            // pixels y ~ 0.003623276 + 0.00000000667947308351 * active_pixels 
+            // total: y ~ 0.01169588 + 0.00000002377661677840 * triangles+0.00000000098337810585 * I(active_pixels * log2(triangles)) 
+            float intersection = 0.01088794 + 0.00000000223050339041 * (m_images[i].m_model_data["active_pixels"] * log2(m_images[i].m_model_data["num_cells"]));
+            float bvh = -0.003422768 + 0.00000002348995072182 * m_images[i].m_model_data["num_cells"];
+            float pixels = 0.003623276 + 0.00000000667947308351 * m_images[i].m_model_data["active_pixels"];
+
+            paviz_agg_prediction += m_images[i].m_model_data["pred_time"];
         }
 #ifdef PARALLEL
         g_paviz->estimate_render(paviz_agg_prediction);
@@ -1146,11 +1184,15 @@ Renderer::Render(vtkmActor *&plot,
 #ifdef PARALLEL
             // End paviz time
             const char *nodeid;
-            double runtime = g_paviz->end_profiling(&nodeid);
+            double runtime = g_paviz->end_profiling(&nodeid, image_count);
+#if 0
             g_running_render_time += runtime;
+#endif
             std::cerr << "TIME " << nodeid << " render done " << now_ms() << std::endl;
             std::cout << "RRR <alpine> " << nodeid << " render time took " << runtime << " sec" << std::endl;
+#if 0
             std::cout << "RRR <alpine> " << nodeid << " total render time now at " << g_running_render_time << " sec" << std::endl;
+#endif
 #endif
         //---------------------------------------------------------------------
         } // close block for RENDER_PAINT Timer
@@ -1483,7 +1525,8 @@ Renderer::ParseCameraNode(const conduit::Node &camera, vtkmCamera &res)
 void
 Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
 {
-    
+    vtkm::cont::GetGlobalRuntimeDeviceTracker().ForceDevice(vtkm::cont::DeviceAdapterTagTBB());
+ 
     std::map<std::string,double> &model_data = m_images.at(image_num).m_model_data;
     model_data.clear();
     std::stringstream ss;
@@ -1553,11 +1596,15 @@ Renderer::GetModelInfo(const vtkmActor &actor, const int &image_num)
     vtkmCanvasRayTracer *rtc = static_cast<vtkmCanvasRayTracer*>(canvas);
     if(rtc == NULL) ALPINE_ERROR("Failed to cast rt canvas");
     r_cam.SetParameters(m_images[image_num].m_camera, *rtc);
+#if 0
     r_cam.SetParameters(m_vtkm_camera, *rtc);
+#endif
     int active_pixels;
     float ave_ray_dist;
 
     r_cam.GetPixelData(actor.GetCoordinates(), active_pixels, ave_ray_dist);
+    std::cerr << "active pixels " << active_pixels
+              << " avg_ray_dist " << ave_ray_dist << std::endl;
 
     ss<<"active_pixels"<<sep<<active_pixels<<"\n";
     ss<<"ave_ray_dist"<<sep<<ave_ray_dist<<"\n";
